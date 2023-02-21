@@ -8,7 +8,9 @@ import datetime
 
 
 angulo_solar_puesta_sol = 0.0
-array_temperaturas = [28.0,30.0,29.0,32.6,31.2]
+array_temperaturas = [28.0,30.0,29.0,32.6,31.2] # °C
+array_humedad = [24,23,67,56,43,25] # %
+array_velocidad_viento = [60, 56, 47, 50, 45]
 
 # def calculoEto(variables):
 #     temperaturaMax = 0
@@ -110,7 +112,7 @@ horas_insolacion = (24/math.pi) * angulo_solar_puesta_sol
 #     #Calculamos la radición de onda corta, usando de referencia un albedo (formula 38)
 #     return (1 - 0.23) * radiacion_extraterrestre
 
-#Calculamos la densidad del flujo del calor del suelo [MJ m-2 hora-1] (Formulas 45 y 46)
+#Calculamos la densidad del flujo del calor del suelo (G) [MJ m-2 hora-1] (Formulas 45 y 46)
 def flujo_calor_suelo(radiacion_neta):
     flujo_calor=0.0
     time_noche=datetime.datetime.strptime("18:30:00", "%H:%M:%S")
@@ -122,9 +124,36 @@ def flujo_calor_suelo(radiacion_neta):
     else:
         flujo_calor = (0.5 * radiacion_neta) #Formula 46
         return flujo_calor
-    
-def temperatura_media(array_temperaturas):
-    media = math.fsum(array_temperaturas) / len(array_temperaturas)
+
+#Calculamos la media de los sensores (temperatura del aire (Thr), Humedad Relativa, _Velocidad del viento
+def media(array_medidas_sensadas):
+    media = math.fsum(array_medidas_sensadas) / len(array_medidas_sensadas)
     return media
+
     
-temperatura_media(array_temperaturas)
+#Calculamos pendiente de la curva de presión de saturación de vapor en Thr (∆)[kPa °C-1] (Formula 13)
+def pendiente_presion_saturacion_vapor(temperatura_media):
+    pendiente = (4098 * presion_saturacion_vapor(temperatura_media)) / math.pow(temperatura_media + 237.3 , 2)
+    return pendiente
+
+#Calculamos la constante psicrométrica [kPa °C-1] (Formula 8),
+def constante_psicrometrica(z):
+    #Se calcula la presion atmosferica [kPa] donde z = altura sobre el nivel de mar
+    presion_atmosferica = 101.3 * math.pow(((293 - (0.0065 * z)) / 293) , 5.26 ) 
+    calor_especifico = 1.013 * math.pow(10, -3) #calor específico a presión constante (Cp) [ MJ kg-1 °C-1], 
+    peso_vapor = 0.622 #cociente del peso molecular de vapor de agua /aire seco (E)
+    calor_latente = 2.45 #calor latente de vaporización[ MJ kg-1] 
+    const_psicrometrica = (calor_especifico * presion_atmosferica) / (peso_vapor * calor_latente)
+    return const_psicrometrica
+
+#presión de saturación de vapor a temperatura del aire Thr [kPa]  (e°(Thr) ) (Formula 11),
+def presion_saturacion_vapor(temperatura_media): 
+    presion = 0.6108 * math.exp((17.27 * temperatura_media) / (temperatura_media + 237.3))
+    return presion
+
+#Calculamos promedio horario de la presión real de vapor [kPa] (Formula 54)
+def presion_real_vapor(presion_saturacion_vapor, humedad_media):
+    presion_real = presion_saturacion_vapor * (humedad_media / 100)
+    return presion_real
+
+
