@@ -1,16 +1,14 @@
-import boto3
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, jsonify
 from flask_cors import CORS, cross_origin
+import db_context as db
+from flask_pymongo import PyMongo
+from bson import ObjectId
+from datetime import datetime
 
-
-#item variables
-
-#Creamos el client para conectaser a dynamodb
-dynamodb = boto3.resource('dynamodb')
-dynamodb_client = boto3.client('dynamodb')
-table = dynamodb.Table('Station')
 
 app = Flask(__name__)
+app.config['MONGO_URI'] = 'mongodb://localhost:27017/weather_project' 
+mongo = PyMongo(app)
 cors = CORS(app)
 
 app.config['CORS_HEADERS'] = 'Content-Type'
@@ -20,31 +18,64 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 def main():
     return render_template('swaggerui.html')
 
-
-#TODO: debe recibir la informacion mediante protocolo https:POST
-@app.route('/Inserted', methods = ['POST'])
+@app.route('/Inserted', methods=['POST'])
 @cross_origin()
-def insert_records():
-    if request.method == 'POST':
-        x = request.get_json()
-        print(type(x))
+def create():
+    item = {}
+    for data in request.json:
+        item = {
+        'date': datetime.now(),
+        "grades": data["grades"],
+        'hour': data['hour'],
+        'humidity': data['humidity'],
+        'julian_day': data['julian_day'],
+        'latitude': data['latitude'],
+        'temperature': data['temperature']
+         }   
+        mongo.db.weather_variables.insert_one(item)
+
+    result = {'message': 'Registro creado exitosamente'}
+    return jsonify(result)
+
+
+@app.route('/get', methods=['GET'])
+@cross_origin()
+def get_all():
+    items = mongo.db.weather_variables.find()
+    result = []
+    for item in items:
+        result.append({'_id': str(item['_id']), 'date': item['date'],'grades': item['grades'], 'hour': item['hour'], 'humidity':item['humidity'], 'julian_day': item['julian_day'], 'latitude': item['latitude'], 'temperature': item['temperature']}) 
+    return jsonify(result)
+
+
+@app.route('/get/<id>', methods=['GET'])
+@cross_origin
+def get_one(id):
+    item = mongo.db.weather_variables.find_one({'_id': ObjectId(id)})
+    if item:
+        result = {'_id': str(item['_id']), 'date': item['date'],'grades': item['grades'], 'hour': item['hour'], 'humidity': item['humidity'], 'julian_day': item['julian_day'], 'latitude': item['latitude'], 'temperature': item['temperature']} 
+    else:
+        result = {'message': 'Registro no encontrado'}
+    return jsonify(result)
+
+@app.route('/getbydate', methods=['GET'])
+@cross_origin()
+def filtrar_fecha():
+    fecha_inicio = request.args.get('fecha_inicio')
+    fecha_fin = request.args.get('fecha_fin')
     
-        #Inserted data on table on dynamodb
-        resp = table.put_item(Item = x)
-        return resp
+    # Convertir las fechas de texto a objetos datetime
+    fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+    fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d')
 
+    # Filtrar los documentos que tienen una fecha dentro del rango
+    resultados = mongo.db.weather_variables.find({"date": {"$gte": fecha_inicio, "$lte": fecha_fin}})
 
-@app.route('/get', methods = ['GET'])
-@cross_origin()
-def get_items():
-    response = table.scan()
-    data = response['Items']
-    # print(data)
-    while 'LastEvaluatedKey' in response:
-        response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
-        data.extend(response['Items'])
-    print(type(data))
-    return data
+    # Crear una lista con los resultados y convertirla a JSON
+    documents = []
+    for resultado in resultados:
+        documents.append(resultado)
+    return jsonify(documents)
 
 
 if __name__ == '__main__':
