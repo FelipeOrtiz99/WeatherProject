@@ -7,9 +7,9 @@ import datetime
 
 
 
-array_temperaturas = [28.0,30.0,29.0,32.6,31.2] # °C
-array_humedad = [24,23,67,56,43,25] # %
-array_velocidad_viento = [60, 56, 47, 50, 45]
+# array_temperaturas = [28.0,30.0,29.0,32.6,31.2] # °C
+# array_humedad = [24,23,67,56,43,25] # %
+# array_velocidad_viento = [60, 56, 47, 50, 45] 
 hora_actual = datetime.datetime.now().hour
 mes_actual = datetime.datetime.today().month
 coordenadas = {'ltd':{'grados':2,'minutos':55,'segundos':39,'orientacion':'N'},
@@ -48,14 +48,14 @@ def julian_day():
     return julian
 
 #Calculamos la radiacion extraterrestres para periodos horarios (Ra) (Formula 28)
-def radiacion_extraterrestre():
+def radiacion_extraterrestre(fraccion_tiempo_sensado = 1):
     constante_solar = 0.082 # MJ m^(-2) min^(-1)
     julian = julian_day()
     global angulo_solar_puesta_sol
     
     ltd_lng_dec = sexagesimal_decimal(coordenadas)
     ltd_lng_rad= decimal_radianes(ltd_lng_dec)
-    fraccion_tiempo_sensado = 1 # duración del periodo considerado [horas]
+    # fraccion_tiempo_sensado = 1 # duración del periodo considerado [horas]
 
 
     #Calculamos la   distancia relativa inversa Tierra-Sol(formula 23)
@@ -90,13 +90,14 @@ def radiacion_extraterrestre():
 
 
 
+
 #Calculo de radiacion solar (Rs) (Formula 35) Formula de Angstrom
 As = 0.25  #Constantes de regresion para nublados y despejados
 bs = 0.5 
-def radiacion_solar(radiacion_extraterrestre, max_insolacion):
+def radiacion_solar(radiacion_extraterrestre, max_insolacion, insolacion = None):
     As = 0.25  #Constantes de regresion para nublados y despejados
-    bs = 0.5 
-    n = insolacion_real[str(mes_actual)] #horas reales de insolacion
+    bs = 0.5
+    n = (insolacion_real[str(mes_actual)] / 24) if insolacion == None else insolacion #horas reales de insolacion      
     N = max_insolacion #horas maximas de insolacion
     Rs = (As + (bs * n/N)) * radiacion_extraterrestre
     return Rs
@@ -131,10 +132,12 @@ def radiacion_neta_larga(temperatura_media,radiacion_solar,radiacion_solar_despe
     return Rnl
 
 #Calculo de Radiacion neta (Rn) (Formula 40)  
-def radiacion_neta(presion_real_vapor,temperatura_media):
+def radiacion_neta(presion_real_vapor,temperatura_media,insolacion):
     Ra = radiacion_extraterrestre()
-    N = (24/math.pi) * angulo_solar_puesta_sol #Horas maximas de insolacion (Formula 34)
-    Rs = radiacion_solar(Ra, N)
+    #Horas maximas de insolacion (Formula 34)
+    N = (24/math.pi) * angulo_solar_puesta_sol 
+    N = N / 24 # se divide por 24 para hallar la insolacion maxima por hora
+    Rs = radiacion_solar(Ra, N, insolacion)
     Rso = radiacion_solar_despejado(Ra, altura)
     Rns = radiacion_neta_corta(Rs)
     Thr = temperatura_media
@@ -188,7 +191,24 @@ def presion_real_vapor(presion_saturacion_vapor, humedad_media):
     return presion_real
 
 
-def calculoEto():
+def calculoEto(data):
+    global array_temperaturas 
+    global array_humedad 
+    global array_velocidad_viento
+    
+    array_temperaturas = data.temperatura
+    array_humedad = data.humedad
+    array_velocidad_viento = data.velocidadViento
+    
+    temperaturaMin = min(array_temperaturas)
+    temperaturaMax = max(array_temperaturas)
+    humedadMin = min(array_humedad)
+    humedadMax = max(array_humedad)
+    velocidad_vientoMin = min(array_velocidad_viento)
+    velocidad_vientoMax = max(array_velocidad_viento)
+    
+    diaJulian = julian_day()
+
     r = constante_psicrometrica(altura)
     Thr = media(array_temperaturas)
     u2 = media(array_velocidad_viento)
@@ -196,10 +216,23 @@ def calculoEto():
     eThr = presion_saturacion_vapor(Thr)
     ea = presion_real_vapor(eThr,HRhr)
     A = pendiente_presion_saturacion_vapor(eThr,Thr)
-    Rn = radiacion_neta(ea,Thr)
+    Rn = radiacion_neta(ea,Thr,data.insolacion)
     G = flujo_calor_suelo(Rn)
     
     ETo = (0.408*A*(Rn-G))/( A + r*(1+(0.34*u2))) + (r*(37/(Thr+273))*u2*(eThr-ea))/ (A + r*(1+(0.34*u2)))
-    return ETo
+    return {
+        'temperature':Thr,
+        'temperatureMin':temperaturaMin,
+        'temperatureMax':temperaturaMax,
+        'humidity':HRhr,
+        'humedadMin': humedadMin,
+        'humedadMax': humedadMax,
+        'vel':u2,
+        'velMin':velocidad_vientoMin,
+        'velMax':velocidad_vientoMax,
+        'julianDay':diaJulian,
+        'rad':Rn,
+        'eto':ETo
+        }
 
-calculoEto()
+julian_day()
