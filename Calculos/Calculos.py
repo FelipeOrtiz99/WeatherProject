@@ -7,81 +7,78 @@ import datetime
 
 
 
-angulo_solar_puesta_sol = 0.0
-array_temperaturas = [28.0,30.0,29.0,32.6,31.2] # °C
-array_humedad = [24,23,67,56,43,25] # %
-array_velocidad_viento = [60, 56, 47, 50, 45]
+# array_temperaturas = [28.0,30.0,29.0,32.6,31.2] # °C
+# array_humedad = [24,23,67,56,43,25] # %
+# array_velocidad_viento = [60, 56, 47, 50, 45] 
+hora_actual = datetime.datetime.now().hour
+mes_actual = datetime.datetime.today().month
+coordenadas = {'ltd':{'grados':2,'minutos':55,'segundos':39,'orientacion':'N'},
+                   'lng':{'grados':75,'minutos':17,'segundos':15,'orientacion':'W'}
+                   }
+#Datos promedios de horas reales de insolacion de la ciudad de Neiva, referencia:atlas.ideam.gov.co/visorAtlasRadiacion.html
+insolacion_real ={'1':6.5,'2':5.5,'3':4.5,'4':4.5,'5':5.5,'6':5.5,'7':5.5,
+                  '8':5.5,'9':5.5,'10':5.5,'11':5.5,'12':5.5}
+altura = 442 # altura sobre el nivel del mar de la ciudad de Neiva
 
-# def calculoEto(variables):
-#     temperaturaMax = 0
-#     temperaturaMin = 1
-#     presionVapor = 1
+
+def sexagesimal_decimal(coordenadas):
+    grados_ltd = coordenadas['ltd']['grados']
+    minutos_ltd = coordenadas['ltd']['minutos']
+    segundos_ltd = coordenadas['ltd']['segundos']
+    orientacion_ltd= coordenadas['ltd']['orientacion']
+    grados_lng = coordenadas['lng']['grados']
+    minutos_lng = coordenadas['lng']['minutos']
+    segundos_lng  = coordenadas['lng']['segundos']
+    orientacion_lng = coordenadas['lng']['orientacion']
+    ltd = grados_ltd + (minutos_ltd / 60) + (segundos_ltd / 60)
+    ltd = ltd if (orientacion_ltd == 'N') else -ltd
     
-#     return 0
+    lng = grados_lng + (minutos_lng / 60) + (segundos_lng / 60)
+    lng = lng if (orientacion_lng == 'E') else -lng
+    return {'ltd':ltd, 'lng':lng}
 
-
-
+def decimal_radianes(coordenadas):
+    ltd = coordenadas['ltd'] * math.pi/180
+    lng = coordenadas['lng'] * math.pi/180
+    return {'ltd':ltd, 'lng':lng}
 
 def julian_day():
     today = datetime.datetime.now()
     julian = (today - datetime.datetime(today.year,1,1)).days + 1
     return julian
 
+#Calculamos la radiacion extraterrestres para periodos horarios (Ra) (Formula 28)
+def radiacion_extraterrestre(fraccion_tiempo_sensado = 1):
+    constante_solar = 0.082 # MJ m^(-2) min^(-1)
+    julian = julian_day()
+    global angulo_solar_puesta_sol
+    
+    ltd_lng_dec = sexagesimal_decimal(coordenadas)
+    ltd_lng_rad= decimal_radianes(ltd_lng_dec)
+    # fraccion_tiempo_sensado = 1 # duración del periodo considerado [horas]
 
-def radiacion_extraterrestre():#data, dia_juliano
-    constante_solar = 0.082
-    coordenadas = {'ltd':{'grados':2,'minutos':55,'segundos':39,'orientacion':'N'},
-                   'lng':{'grados':75,'minutos':17,'segundos':15,'orientacion':'W'}
-                   }
-    ltd_lng_dec = {'ltd':2.9275, 'lng':-75.2875}
-    ltd_lng_rad={'ltd':0.05109451385, 'lng':-1.314014761}
-    fraccion_tiempo_sensado = 1 # duración del periodo considerado [horas]
-    global angulo_solar_puesta_sol;
-
-    # info = js.loads(data)
-
-    # hora_inicio = info["sensado"]["horainicio"]
-    # hora_fin = info["sensado"]["horafin"]
-    # hora_media = (hora_inicio + hora_fin) / 2
-    # grades = info["altura"]["grades"]
-    # minutes = info["altura"]["minutes"]
-    # latitud_radianes = 0.0
-    # distancia_tierra_sol = 0.0
-    # declinacion_solar = 0.0
-    # angulo_solar_medio = 0.0
-    # grados_greenwich = info["longitud"]["grados"]
-    # correcion_estacional = 0.0
-    # fraccion_tiempo_sensado = info["sensado"]["fraccion"]
-
-    # if info["altura"]["orientation"] == 'N' :
-    #     grades_decimal = grades + (minutes/60)
-    #     latitud_radianes = round((math.pi/180) * grades_decimal, 2)
-    # else:
-    #     grades_decimal = grades + (minutes/60)
-    #     latitud_radianes = round((math.pi/180) * grades_decimal, 2)
-
-    #Calculamos la longitud oeste de greenwich
-    # longitud_oeste_greenwith = (((info["longitud"]["segundos"] / 60) + (info["longitud"]["minutos"]))/60) + info["longitud"]["grados"]
 
     #Calculamos la   distancia relativa inversa Tierra-Sol(formula 23)
-    distancia_tierra_sol = 1 + 0.033 * math.cos((2*math.pi*julian_day())/365)
+    distancia_tierra_sol = 1 + (0.033 * math.cos((2*math.pi*julian)/365))
     
     #Calculamos la declinación solar (formula 24)
-    declinacion_solar = 0.409 * math.sin(((2*math.pi*julian_day())/365) - 1.39)
+    declinacion_solar = 0.409 * math.sin(((2*math.pi*julian)/365) - 1.39)
     
     #Calculamos el angulo solar en el punto medio del periodo (ω) (formula 31)
-    hora_actual = datetime.datetime.now().hour
-    Lz = coordenadas['lng']['minutos']  #longitud del centro de la zona de tiempo local [grados oeste de Greenwich]
-    Lm = math.fabs(ltd_lng_dec['lng']) #longitud de la zona de medición [grados oeste de Greenwich]
+    Lz = 75  #longitud del centro de la zona de tiempo local (Colombia) [grados oeste de Greenwich]
+    Lm = math.fabs(ltd_lng_dec['lng']) #longitud de la zona de medición (Neiva) [grados oeste de Greenwich]
     #Calculamos la constante b para la correcion estacional (formula 33)
-    b = (2 * math.pi * (julian_day() - 81)) / 364
+    b = (2 * math.pi * (julian - 81)) / 364
     #Calculamos la correción estacional (formula 32)
     correcion_estacional = (0.1645 * math.sin(2 * b)) - (0.1255 * math.cos(b)) - (0.025 * math.sin(b))
     # ángulo solar a la hora de la puesta del sol (ωs) (formula 25)
-    angulo_solar_puesta_sol = math.acos(-math.tan(ltd_lng_rad['ltd']) * math.tan(distancia_tierra_sol))
+    angulo_solar_puesta_sol = math.acos(-math.tan(ltd_lng_rad['ltd']) * math.tan(declinacion_solar))
     # ángulo solar medio (ω)
     angulo_solar_medio = (math.pi / 12) * (((hora_actual + 0.5) + 0.06667 * (Lz - Lm) + correcion_estacional) - 12) 
-
+    
+    if angulo_solar_medio < -angulo_solar_puesta_sol or angulo_solar_medio > angulo_solar_puesta_sol :
+        return 0
+    
     #Calculamos el angulo solar medio ω1 (formula 29)
     angulo_solar_medio1 = angulo_solar_medio - ((math.pi * fraccion_tiempo_sensado) / 24)
     #Calculamos el angulo solar medio ω2 (formula 30)
@@ -92,32 +89,69 @@ def radiacion_extraterrestre():#data, dia_juliano
     return radicion_extraterrestre
 
 
-horas_insolacion = (24/math.pi) * angulo_solar_puesta_sol
 
 
-#Metodó para calcula la insolación maxima del día
-# def insolacion_maxima(radiacion_extraterrestre):
-#     return (24/math.pi) * radiacion_extraterrestre
+#Calculo de radiacion solar (Rs) (Formula 35) Formula de Angstrom
+As = 0.25  #Constantes de regresion para nublados y despejados
+bs = 0.5 
+def radiacion_solar(radiacion_extraterrestre, max_insolacion, insolacion = None):
+    As = 0.25  #Constantes de regresion para nublados y despejados
+    bs = 0.5
+    n = (insolacion_real[str(mes_actual)] / 24) if insolacion == None else insolacion #horas reales de insolacion      
+    N = max_insolacion #horas maximas de insolacion
+    Rs = (As + (bs * n/N)) * radiacion_extraterrestre
+    return Rs
+
+#Calculo de radiacion solar de un dia despejado (Rso) (Formula 37)
+def radiacion_solar_despejado(radiacion_extraterrestre, altura):
+    Rso = (0.75 + (2 * math.pow(10,-5) * altura)) * radiacion_extraterrestre
+    return Rso
+
+#Calculo de radiacion neta solar o de onda corta (Rns) (Formula 38)
+def radiacion_neta_corta(radiacion_solar):
+    #0.23=coeficiente de reflexion del cultivo hipotetico de referencia 
+    Rns = (1 - 0.23) * radiacion_solar
+    return Rns
+
+#Calculo de radiacion neta de onda larga (Rnl) (Formula 39)
+def radiacion_neta_larga(temperatura_media,radiacion_solar,radiacion_solar_despejado,presion_real_vapor):
+    constStefan = 2.043 * math.pow(10,-10) #constante de Stefan-Boltzmann
+    ea = presion_real_vapor#Presion real del vapor (presion_saturacion_vapor, humedad_media)
+    Rs = radiacion_solar#Radiacion solar(radiacion_extraterrestre)
+    Rso = radiacion_solar_despejado#radiacion solar de un dia despejado(radiacion_extraterrestre, altura)
+    if (Rs == 0.0 and Rso == 0.0):
+        if (presion_real_vapor > 3.16):
+            R = 0.75 #valor de relacion de nubosidad en horas de la noche para climas humedos 
+        elif (presion_real_vapor > 1.7):
+            R = 0.5
+        else:
+            R = 0.3
+    else:
+        R = Rs / Rso
+    Rnl = constStefan * math.pow(temperatura_media + 273.16,4) * (0.34 - (0.14 * math.sqrt(ea))) * ((1.35 * (R)) - 0.35)
+    return Rnl
+
+#Calculo de Radiacion neta (Rn) (Formula 40)  
+def radiacion_neta(presion_real_vapor,temperatura_media,insolacion):
+    Ra = radiacion_extraterrestre()
+    #Horas maximas de insolacion (Formula 34)
+    N = (24/math.pi) * angulo_solar_puesta_sol 
+    N = N / 24 # se divide por 24 para hallar la insolacion maxima por hora
+    Rs = radiacion_solar(Ra, N, insolacion)
+    Rso = radiacion_solar_despejado(Ra, altura)
+    Rns = radiacion_neta_corta(Rs)
+    Thr = temperatura_media
+    Rnl = radiacion_neta_larga(Thr,Rs,Rso,presion_real_vapor)
+    return (Rns - Rnl)
 
 
-# def radiacion_solar(radiacion_extraterrestre):
-
-
-#     radiacion_onda_corta = 0.0
-#     duracion_real_insolacion = 0
-
-
-
-# def radicion_onda_corta(radiacion_extraterrestre):
-#     #Calculamos la radición de onda corta, usando de referencia un albedo (formula 38)
-#     return (1 - 0.23) * radiacion_extraterrestre
 
 #Calculamos la densidad del flujo del calor del suelo (G) [MJ m-2 hora-1] (Formulas 45 y 46)
 def flujo_calor_suelo(radiacion_neta):
     flujo_calor=0.0
-    time_noche=datetime.datetime.strptime("18:30:00", "%H:%M:%S")
-    time_dia=datetime.datetime.strptime("06:30:00", "%H:%M:%S")
-    time_ahora=datetime.datetime.now()
+    time_ahora=datetime.datetime.now().time()
+    time_noche=datetime.datetime.now().strptime("18:30:00", "%H:%M:%S").time()
+    time_dia=datetime.datetime.now().strptime("06:30:00", "%H:%M:%S").time()
     if time_ahora > time_dia and time_ahora < time_noche:
         flujo_calor = (0.1 * radiacion_neta) #Formula 45
         return flujo_calor
@@ -132,8 +166,8 @@ def media(array_medidas_sensadas):
 
     
 #Calculamos pendiente de la curva de presión de saturación de vapor en Thr (∆)[kPa °C-1] (Formula 13)
-def pendiente_presion_saturacion_vapor(temperatura_media):
-    pendiente = (4098 * presion_saturacion_vapor(temperatura_media)) / math.pow(temperatura_media + 237.3 , 2)
+def pendiente_presion_saturacion_vapor(presion_saturacion_vapor,temperatura_media):
+    pendiente = (4098 * presion_saturacion_vapor) / math.pow(temperatura_media + 237.3 , 2)
     return pendiente
 
 #Calculamos la constante psicrométrica [kPa °C-1] (Formula 8),
@@ -157,3 +191,48 @@ def presion_real_vapor(presion_saturacion_vapor, humedad_media):
     return presion_real
 
 
+def calculoEto(data):
+    global array_temperaturas 
+    global array_humedad 
+    global array_velocidad_viento
+    
+    array_temperaturas = data.temperatura
+    array_humedad = data.humedad
+    array_velocidad_viento = data.velocidadViento
+    
+    temperaturaMin = min(array_temperaturas)
+    temperaturaMax = max(array_temperaturas)
+    humedadMin = min(array_humedad)
+    humedadMax = max(array_humedad)
+    velocidad_vientoMin = min(array_velocidad_viento)
+    velocidad_vientoMax = max(array_velocidad_viento)
+    
+    diaJulian = julian_day()
+
+    r = constante_psicrometrica(altura)
+    Thr = media(array_temperaturas)
+    u2 = media(array_velocidad_viento)
+    HRhr = media(array_humedad)
+    eThr = presion_saturacion_vapor(Thr)
+    ea = presion_real_vapor(eThr,HRhr)
+    A = pendiente_presion_saturacion_vapor(eThr,Thr)
+    Rn = radiacion_neta(ea,Thr,data.insolacion)
+    G = flujo_calor_suelo(Rn)
+    
+    ETo = (0.408*A*(Rn-G))/( A + r*(1+(0.34*u2))) + (r*(37/(Thr+273))*u2*(eThr-ea))/ (A + r*(1+(0.34*u2)))
+    return {
+        'temperature':Thr,
+        'temperatureMin':temperaturaMin,
+        'temperatureMax':temperaturaMax,
+        'humidity':HRhr,
+        'humedadMin': humedadMin,
+        'humedadMax': humedadMax,
+        'vel':u2,
+        'velMin':velocidad_vientoMin,
+        'velMax':velocidad_vientoMax,
+        'julianDay':diaJulian,
+        'rad':Rn,
+        'eto':ETo
+        }
+
+julian_day()
