@@ -21,7 +21,7 @@ def login():
     if not user:
          return abort(404)
     
-    result = {'name': user['name'], 'email': user['email']}
+    result = {'uid': str(user['_id']),'displayName': user['name'], 'email': user['email'], 'photoURL': ''}
 
     return jsonify(result)
 
@@ -43,3 +43,4 @@ def create_user():
     user_inserted = mongo['users'].insert_one(user)
 
     return jsonify({'message': 'Usuario creado', 'inserted_id': str(user_inserted.inserted_id)})
+
