@@ -42,8 +42,4 @@ def create_user():
 
     user_inserted = mongo['users'].insert_one(user)
 
-    return jsonify(user_inserted.inserted_id)
-
-
-    
-
+    return jsonify({'message': 'Usuario creado', 'inserted_id': str(user_inserted.inserted_id)})
