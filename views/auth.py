@@ -44,7 +44,3 @@ def create_user():
 
     return jsonify({'message': 'Usuario creado', 'inserted_id': str(user_inserted.inserted_id)})
 
-
-
-    
-
