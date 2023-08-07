@@ -8,13 +8,6 @@ import connections
 
 mongo = connections.get_mongo_db()
 
-
-@auth_bp.route('/')
-@cross_origin()
-def index():
-    return render_template('auth/login.html')
-
-
 @auth_bp.route('/login', methods = ['POST'])
 @cross_origin()
 def login():
@@ -49,7 +42,8 @@ def create_user():
 
     user_inserted = mongo['users'].insert_one(user)
 
-    return user_inserted.acknowledged
+    return jsonify({'message': 'Usuario creado', 'inserted_id': str(user_inserted.inserted_id)})
+
 
 
     
